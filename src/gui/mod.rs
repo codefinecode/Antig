@@ -281,6 +281,20 @@ impl eframe::App for App {
 /// PCs" and a support thread.
 pub fn run() -> Result<(), String> {
     fn options(renderer: eframe::Renderer) -> eframe::NativeOptions {
+        // wgpu 0.36 enables Vulkan on Windows as one of its default backends.
+        // This machine has an Intel UHD 605 with a 2020 driver whose Vulkan
+        // implementation (igvk64.dll) crashes during instance/device setup with
+        // STATUS_ACCESS_VIOLATION. DX12 is available and was verified on this
+        // exact machine by launching the same binary with WGPU_BACKEND=dx12.
+        //
+        // Keep wgpu as the renderer, but constrain the backend explicitly on
+        // Windows so wgpu never probes the broken Vulkan path first.
+        let mut wgpu_options = eframe::egui_wgpu::WgpuConfiguration::default();
+        #[cfg(target_os = "windows")]
+        if let eframe::egui_wgpu::WgpuSetup::CreateNew(ref mut setup) = wgpu_options.wgpu_setup {
+            setup.instance_descriptor.backends = eframe::egui_wgpu::wgpu::Backends::DX12;
+        }
+
         eframe::NativeOptions {
             viewport: {
                 let mut vp = egui::ViewportBuilder::default()
@@ -295,6 +309,7 @@ pub fn run() -> Result<(), String> {
                 vp
             },
             renderer,
+            wgpu_options,
             ..Default::default()
         }
     }
