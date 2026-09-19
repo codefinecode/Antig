@@ -87,6 +87,8 @@ pub struct App {
     providers_reordering: bool,
     path_dialog: Option<String>,
     path_dialog_error: Option<String>,
+    /// When «Скопировать отчёт» was last pressed, for the few seconds the card
+    /// says so.
     report_copied_at: Option<std::time::Instant>,
 }
 
@@ -117,8 +119,14 @@ impl App {
         // from here on — two writers each saving the whole thing meant whichever
         // saved last silently reverted the other.
         let settings = Settings::load();
+        let screen = first_screen();
+        // A debug build told to skip the key never passes the licence screen,
+        // which is where `Unlocked` is otherwise sent from.
+        if matches!(screen, Screen::Main) {
+            worker.send(Cmd::Unlocked);
+        }
         Self {
-            screen: Screen::License,
+            screen,
             key_input: String::new(),
             key_rejected: false,
             key_needs_focus: true,
@@ -285,14 +293,8 @@ impl eframe::App for App {
 /// PCs" and a support thread.
 pub fn run() -> Result<(), String> {
     fn options(renderer: eframe::Renderer) -> eframe::NativeOptions {
-        // wgpu 0.36 enables Vulkan on Windows as one of its default backends.
-        // This machine has an Intel UHD 605 with a 2020 driver whose Vulkan
-        // implementation (igvk64.dll) crashes during instance/device setup with
-        // STATUS_ACCESS_VIOLATION. DX12 is available and was verified on this
-        // exact machine by launching the same binary with WGPU_BACKEND=dx12.
-        //
-        // Keep wgpu as the renderer, but constrain the backend explicitly on
-        // Windows so wgpu never probes the broken Vulkan path first.
+        // Intel UHD 605 on the target machine crashes in Vulkan (igvk64.dll).
+        // Force wgpu to DX12 on Windows so it never probes the broken backend.
         let mut wgpu_options = eframe::egui_wgpu::WgpuConfiguration::default();
         #[cfg(target_os = "windows")]
         if let eframe::egui_wgpu::WgpuSetup::CreateNew(ref mut setup) = wgpu_options.wgpu_setup {
@@ -333,6 +335,18 @@ pub fn run() -> Result<(), String> {
         )
         .map_err(|second| format!("не удалось открыть окно (DirectX: {first}; OpenGL: {second})")),
     }
+}
+
+/// The licence screen, always - except in a *debug* build started with
+/// `AG_UNLOCKER_DEV_SKIP_KEY` set, so the main screen can be looked at while it
+/// is being worked on. Compiled out of every release build (`build_rust.py`
+/// builds release), so a shipped exe has no way past the key.
+fn first_screen() -> Screen {
+    #[cfg(debug_assertions)]
+    if std::env::var_os("AG_UNLOCKER_DEV_SKIP_KEY").is_some() {
+        return Screen::Main;
+    }
+    Screen::License
 }
 
 fn title() -> String {
