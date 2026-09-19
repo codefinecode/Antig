@@ -87,6 +87,7 @@ pub struct App {
     providers_reordering: bool,
     path_dialog: Option<String>,
     path_dialog_error: Option<String>,
+    report_copied_at: Option<std::time::Instant>,
 }
 
 impl App {
@@ -140,6 +141,7 @@ impl App {
             providers_reordering: false,
             path_dialog: None,
             path_dialog_error: None,
+            report_copied_at: None,
         }
     }
 
