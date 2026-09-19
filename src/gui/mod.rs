@@ -7,6 +7,8 @@
 mod icon;
 mod license;
 mod main_view;
+mod report;
+mod status;
 mod theme;
 mod widgets;
 
